@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IoT Dashboard - Monitoring Sensor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root {
+    --bg-main: #0b1120;
+    --bg-card: #131c31;
+    --bg-subcard: #0f172a;
+    --border-color: rgba(148, 163, 184, 0.14);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-primary: #6366f1;
+    --accent-primary-hover: #4f46e5;
+    --accent-temp: #f97316;
+    --accent-hum: #06b6d4;
+    --success-bg: rgba(16, 185, 129, 0.14);
+    --success-text: #34d399;
+    --success-border: rgba(16, 185, 129, 0.35);
+    --danger-bg: rgba(244, 63, 94, 0.14);
+    --danger-text: #fb7185;
+    --danger-border: rgba(244, 63, 94, 0.35);
+    --warning-bg: rgba(245, 158, 11, 0.14);
+    --warning-text: #fbbf24;
+    --warning-border: rgba(245, 158, 11, 0.35);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+    background-color: var(--bg-main);
+    background-image: 
+        radial-gradient(circle at 15% 10%, rgba(99, 102, 241, 0.12), transparent 35%),
+        radial-gradient(circle at 85% 90%, rgba(6, 182, 212, 0.10), transparent 35%);
+    min-height: 100vh;
+    padding: 28px 20px;
+    color: var(--text-primary);
+}
+
+.container {
+    max-width: 1160px;
+    margin: auto;
+}
+
+/* HEADER */
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-title h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+
+.header-title p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.notif-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.notif-toggle-btn:hover {
+    border-color: rgba(148, 163, 184, 0.35);
+    color: var(--text-primary);
+}
+
+.notif-toggle-btn.active {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+}
+
+.live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #818cf8;
+    box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.7);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(129, 140, 248, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0); }
+}
+
+/* TOAST NOTIFICATIONS */
+#toast-container {
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 370px;
+    width: calc(100vw - 44px);
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: rgba(19, 28, 49, 0.96);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-left-width: 4px;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast.hiding {
+    animation: toastSlideOut 0.25s ease forwards;
+}
+
+.toast-success { border-left-color: #10b981; }
+.toast-warning { border-left-color: #f59e0b; }
+.toast-error   { border-left-color: #f43f5e; }
+.toast-info    { border-left-color: #6366f1; }
+
+.toast-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.toast-success .toast-icon { background: var(--success-bg); color: var(--success-text); }
+.toast-warning .toast-icon { background: var(--warning-bg); color: var(--warning-text); }
+.toast-error   .toast-icon { background: var(--danger-bg);  color: var(--danger-text); }
+.toast-info    .toast-icon { background: rgba(99, 102, 241, 0.16); color: #818cf8; }
+
+.toast-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.toast-msg {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    word-wrap: break-word;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.15s;
+}
+
+.toast-close:hover {
+    color: var(--text-primary);
+}
+
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 100%;
+    transform-origin: left;
+    animation: progressShrink linear forwards;
+}
+
+.toast-success .toast-progress { background: #10b981; }
+.toast-warning .toast-progress { background: #f59e0b; }
+.toast-error   .toast-progress { background: #f43f5e; }
+.toast-info    .toast-progress { background: #6366f1; }
+
+@keyframes toastSlideIn {
+    from { opacity: 0; transform: translateX(100%); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastSlideOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(110%); }
+}
+
+@keyframes progressShrink {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
+/* KPI CARDS */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.card, .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 22px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+}
+
+.card {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.card-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-temp { background: rgba(249, 115, 22, 0.14); color: var(--accent-temp); }
+.icon-hum { background: rgba(6, 182, 212, 0.14); color: var(--accent-hum); }
+.icon-conn { background: rgba(99, 102, 241, 0.14); color: #818cf8; }
+.icon-shield { background: rgba(16, 185, 129, 0.14); color: #34d399; }
+
+.metric-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.value-temp { color: var(--accent-temp); }
+.value-hum { color: var(--accent-hum); }
+
+.unit {
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* BADGES */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 1px solid transparent;
+}
+
+.status-badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.online, .normal {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-border);
+}
+
+.offline, .warning {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: var(--danger-border);
+}
+
+/* PANELS & GRID */
+.panel {
+    margin-bottom: 22px;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    gap: 12px;
+}
+
+.panel-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel-title h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.panel-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.two-col-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 22px;
+    margin-bottom: 22px;
+}
+
+.two-col-grid .panel {
+    margin-bottom: 0;
+}
+
+/* FORM & THRESHOLD */
+.threshold-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 11px 14px;
+    background: var(--bg-subcard);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 20px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background: var(--accent-primary);
+    color: white;
+    margin-top: 16px;
+}
+
+.btn-primary:hover {
+    background: var(--accent-primary-hover);
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+}
+
+.btn-on {
+    background: rgba(16, 185, 129, 0.16);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    flex: 1;
+}
+
+.btn-on:hover {
+    background: #10b981;
+    color: #06281e;
+}
+
+.btn-off {
+    background: rgba(244, 63, 94, 0.16);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.4);
+    flex: 1;
+}
+
+.btn-off:hover {
+    background: #f43f5e;
+    color: white;
+}
+
+.threshold-status {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.threshold-box {
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--bg-subcard);
+    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.threshold-box p {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+/* ALERT BANNER */
+.alert-box {
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
+    transition: all 0.25s ease;
+}
+
+/* CHART */
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* ENHANCED TABLE: 10 DATA SENSOR TERAKHIR */
+.table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-subcard);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead th {
+    background: rgba(30, 41, 59, 0.85);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+tbody tr {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+    transition: background-color 0.15s ease;
+}
+
+tbody tr:last-child {
+    border-bottom: none;
+}
+
+tbody tr:hover {
+    background-color: rgba(99, 102, 241, 0.07);
+}
+
+tbody td {
+    padding: 13px 16px;
+    font-size: 13.5px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.col-no {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    font-size: 12px;
+    width: 52px;
+}
+
+.col-time {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.val-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.val-chip.temp-normal {
+    background: rgba(249, 115, 22, 0.10);
+    color: #fdba74;
+}
+
+.val-chip.hum-normal {
+    background: rgba(6, 182, 212, 0.10);
+    color: #67e8f9;
+}
+
+.val-chip.val-alert {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border: 1px solid var(--danger-border);
+}
+
+.table-empty {
+    text-align: center !important;
+    padding: 28px !important;
+    color: var(--text-muted) !important;
+    font-style: italic;
+}
+
+/* TERMINAL LOG */
+#log {
+    background: #070b14;
+    border: 1px solid var(--border-color);
+    color: #34d399;
+    padding: 16px;
+    border-radius: 12px;
+    max-height: 210px;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.75;
+}
+
+#log::-webkit-scrollbar,
+.table-wrapper::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+#log::-webkit-scrollbar-thumb,
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 999px;
+}
+
+#log .error { color: #fb7185; }
+#log .info { color: #60a5fa; }
+#log .success { color: #34d399; }
+#log .warning-log { color: #fbbf24; }
+
+@media (max-width: 860px) {
+    .two-col-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    body { padding: 14px; }
+    .header-title h1 { font-size: 20px; }
+    .panel, .card { padding: 16px; }
+    .threshold-status { grid-template-columns: 1fr; }
+    .controls { flex-direction: column; }
+    .btn-primary { width: 100%; }
+    #toast-container { top: 12px; right: 12px; width: calc(100vw - 24px); }
+}
+</style>
+</head>
+
+<body>
+
+<!-- CONTAINER TOAST NOTIFIKASI -->
+<div id="toast-container"></div>
+
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-title">
+            <h1>IoT Dashboard Monitoring Sensor</h1>
+            <p>Sistem Telemetri Suhu, Kelembaban &amp; Kontrol Aktuator Real-time</p>
+        </div>
+
+        <div class="header-actions">
+            <button id="btn-notif-toggle" class="notif-toggle-btn" onclick="toggleNotifSettings()" title="Aktifkan suara alarm &amp; notifikasi desktop">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <span id="notif-toggle-text">Alarm &amp; Desktop: OFF</span>
+            </button>
+
+            <div class="live-pill">
+                <span class="pulse-dot"></span>
+                Node-RED API Connected
+            </div>
+        </div>
+    </div>
+
+    <!-- MONITORING SENSOR (KPI CARDS) -->
+    <div class="cards">
+
+        <div class="card">
+            <div class="card-top">
+                <div class="label">Suhu Ruangan</div>
+                <div class="card-icon icon-temp">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+                </div>
+            </div>
+            <div class="metric-row">
+                <div class="value value-temp" id="suhu">--</div>
+                <div class="unit">°C</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-top">
+                <div class="label">Kelembaban</div>
+                <div class="card-icon icon-hum">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                </div>
+            </div>
+            <div class="metric-row">
+                <div class="value value-hum" id="kelembaban">--</div>
+                <div class="unit">%</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-top">
+                <div class="label">Status Sensor</div>
+                <div class="card-icon icon-conn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                </div>
+            </div>
+            <div style="margin-top: 8px;">
+                <span class="status-badge offline" id="status-badge">OFFLINE</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-top">
+                <div class="label">Status Threshold</div>
+                <div class="card-icon icon-shield">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+            </div>
+            <div style="margin-top: 8px;">
+                <span class="status-badge normal" id="threshold-badge">NORMAL</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- THRESHOLD & KONTROL + PERINGATAN -->
+    <div class="two-col-grid">
+
+        <!-- PENGATURAN THRESHOLD -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                    <h2>Pengaturan Threshold Sensor</h2>
+                </div>
+            </div>
+
+            <div class="threshold-grid">
+                <div class="form-group">
+                    <label for="thresholdSuhu">Batas Suhu Maksimum (°C)</label>
+                    <input type="number" id="thresholdSuhu" value="30" min="-50" max="100" step="0.1">
+                </div>
+
+                <div class="form-group">
+                    <label for="thresholdKelembaban">Batas Kelembaban Maks (%)</label>
+                    <input type="number" id="thresholdKelembaban" value="80" min="0" max="100" step="0.1">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="simpanThreshold()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Simpan Threshold
+            </button>
+
+            <div class="threshold-status">
+                <div class="threshold-box">
+                    <p>STATUS SUHU</p>
+                    <span class="status-badge normal" id="statusSuhu">NORMAL</span>
+                </div>
+
+                <div class="threshold-box">
+                    <p>STATUS KELEMBABAN</p>
+                    <span class="status-badge normal" id="statusKelembaban">NORMAL</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- KONTROL PERANGKAT & PERINGATAN -->
+        <div class="panel" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+                        <h2>Kontrol Perangkat</h2>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-on" onclick="kontrol('lamp','on')">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+                        Nyalakan Lampu
+                    </button>
+
+                    <button class="btn btn-off" onclick="kontrol('lamp','off')">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                        Matikan Lampu
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <div class="panel-header" style="margin-bottom: 10px;">
+                    <div class="panel-title">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <h2>Peringatan Sensor</h2>
+                    </div>
+                </div>
+
+                <div id="peringatan" class="alert-box">
+                    Sensor dalam kondisi NORMAL
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- GRAFIK SENSOR -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <h2>Grafik Monitoring Sensor</h2>
+            </div>
+            <span class="panel-subtitle">20 pembacaan terakhir (update tiap 3 detik)</span>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="sensorChart"></canvas>
+        </div>
+    </div>
+
+    <!-- HISTORY: 10 DATA SENSOR TERAKHIR -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <h2>10 Data Sensor Terakhir</h2>
+            </div>
+            <span class="panel-subtitle">Riwayat terbaru dari database</span>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Waktu</th>
+                        <th>Suhu (°C)</th>
+                        <th>Kelembaban (%)</th>
+                        <th>Status Kondisi</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    <tr>
+                        <td colspan="5" class="table-empty">Memuat riwayat data sensor...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                <h2>Log Aktivitas Sistem</h2>
+            </div>
+            <span class="panel-subtitle">Console diagnostik real-time</span>
+        </div>
+
+        <div id="log"></div>
+    </div>
+
+</div>
+
+
+<script>
+
+// =====================================
+// KONFIGURASI API
+// =====================================
+
+const API_BASE = 'http://127.0.0.1:1880/api';
+const API_KEY = 'KULIAH-API-2026';
+
+
+// =====================================
+// VARIABEL STATE & NOTIFIKASI
+// =====================================
+
+let batasSuhu = 30;
+let batasKelembaban = 80;
+let sensorOnline = false;
+let lastWarning = '';
+let offlineNotified = false;
+let alarmDesktopEnabled = false;
+
+
+// =====================================
+// SISTEM NOTIFIKASI (TOAST, DESKTOP, SUARA)
+// =====================================
+
+const TOAST_ICONS = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+    warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+};
+
+function showToast(title, message, type = 'info', duration = 4500) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    toast.innerHTML = `
+        <div class="toast-icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</div>
+        <div class="toast-body">
+            <div class="toast-title">${title}</div>
+            <div class="toast-msg">${message}</div>
+        </div>
+        <button class="toast-close" aria-label="Tutup">&times;</button>
+        <div class="toast-progress" style="animation-duration: ${duration}ms"></div>
+    `;
+
+    const dismiss = () => {
+        if (toast.classList.contains('hiding')) return;
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 250);
+    };
+
+    toast.querySelector('.toast-close').addEventListener('click', dismiss);
+    container.appendChild(toast);
+
+    setTimeout(dismiss, duration);
+}
+
+function playAlertSound() {
+    if (!alarmDesktopEnabled) return;
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioCtx();
+        const now = audioCtx.currentTime;
+
+        [880, 1174.66].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.16);
+
+            gain.gain.setValueAtTime(0.15, now + idx * 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.16 + 0.14);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + idx * 0.16);
+            osc.stop(now + idx * 0.16 + 0.15);
+        });
+    } catch (e) {
+        // Abaikan jika browser memblokir audio sebelum interaksi user
+    }
+}
+
+function sendDesktopNotif(title, body) {
+    if (!alarmDesktopEnabled) return;
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body });
+    }
+}
+
+async function toggleNotifSettings() {
+    const btn = document.getElementById('btn-notif-toggle');
+    const label = document.getElementById('notif-toggle-text');
+
+    if (!alarmDesktopEnabled) {
+        if ('Notification' in window && Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
+        alarmDesktopEnabled = true;
+        btn.classList.add('active');
+        label.textContent = 'Alarm & Desktop: ON';
+        playAlertSound();
+        showToast(
+            'Notifikasi Ekstra Aktif',
+            'Suara alarm & notifikasi desktop akan aktif saat threshold terlampaui.',
+            'info',
+            3500
+        );
+    } else {
+        alarmDesktopEnabled = false;
+        btn.classList.remove('active');
+        label.textContent = 'Alarm & Desktop: OFF';
+        showToast('Notifikasi Ekstra Nonaktif', 'Hanya notifikasi toast di layar yang aktif.', 'info', 3000);
+    }
+}
+
+
+// =====================================
+// GRAFIK (CHART.JS)
+// =====================================
+
+const canvas = document.getElementById('sensorChart');
+const ctx = canvas.getContext('2d');
+
+const gradSuhu = ctx.createLinearGradient(0, 0, 0, 300);
+gradSuhu.addColorStop(0, 'rgba(249, 115, 22, 0.30)');
+gradSuhu.addColorStop(1, 'rgba(249, 115, 22, 0.0)');
+
+const gradKelembaban = ctx.createLinearGradient(0, 0, 0, 300);
+gradKelembaban.addColorStop(0, 'rgba(6, 182, 212, 0.30)');
+gradKelembaban.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+const sensorChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: 'Suhu (°C)',
+                data: [],
+                borderColor: '#f97316',
+                backgroundColor: gradSuhu,
+                borderWidth: 2.5,
+                pointBackgroundColor: '#f97316',
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                fill: true,
+                tension: 0.35
+            },
+            {
+                label: 'Kelembaban (%)',
+                data: [],
+                borderColor: '#06b6d4',
+                backgroundColor: gradKelembaban,
+                borderWidth: 2.5,
+                pointBackgroundColor: '#06b6d4',
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                fill: true,
+                tension: 0.35
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            legend: {
+                labels: {
+                    color: '#cbd5e1',
+                    usePointStyle: true,
+                    padding: 20,
+                    font: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: '600' }
+                }
+            },
+            tooltip: {
+                backgroundColor: '#0f172a',
+                titleColor: '#f8fafc',
+                bodyColor: '#cbd5e1',
+                borderColor: 'rgba(148, 163, 184, 0.25)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 10
+            }
+        },
+        scales: {
+            x: {
+                grid: { color: 'rgba(148, 163, 184, 0.08)' },
+                ticks: { color: '#94a3b8', font: { family: "'JetBrains Mono', monospace", size: 11 } }
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(148, 163, 184, 0.08)' },
+                ticks: { color: '#94a3b8', font: { family: "'JetBrains Mono', monospace", size: 11 } }
+            }
+        }
+    }
+});
+
+
+// =====================================
+// HEADER API
+// =====================================
+
+function getHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY
+    };
+}
+
+
+// =====================================
+// LOG AKTIVITAS
+// =====================================
+
+function log(pesan, tipe = 'info') {
+    const el = document.getElementById('log');
+    const item = document.createElement('div');
+    item.className = tipe;
+    item.textContent = `[${new Date().toLocaleTimeString()}] ${pesan}`;
+    el.appendChild(item);
+    el.scrollTop = el.scrollHeight;
+}
+
+
+// =====================================
+// STATUS SENSOR
+// =====================================
+
+function updateStatus(online) {
+    sensorOnline = online;
+    const badge = document.getElementById('status-badge');
+
+    if (online) {
+        badge.textContent = 'ONLINE';
+        badge.className = 'status-badge online';
+    } else {
+        badge.textContent = 'OFFLINE';
+        badge.className = 'status-badge offline';
+
+        document.getElementById('threshold-badge').textContent = 'TIDAK DIKETAHUI';
+        document.getElementById('threshold-badge').className = 'status-badge offline';
+    }
+}
+
+
+// =====================================
+// SIMPAN THRESHOLD
+// =====================================
+
+function simpanThreshold() {
+    const suhu = Number(document.getElementById('thresholdSuhu').value);
+    const kelembaban = Number(document.getElementById('thresholdKelembaban').value);
+
+    if (
+        document.getElementById('thresholdSuhu').value === '' ||
+        document.getElementById('thresholdKelembaban').value === '' ||
+        !Number.isFinite(suhu) ||
+        !Number.isFinite(kelembaban) ||
+        suhu < -50 || suhu > 100 ||
+        kelembaban < 0 || kelembaban > 100
+    ) {
+        showToast(
+            'Input Tidak Valid',
+            'Pastikan suhu (-50 s/d 100°C) dan kelembaban (0 s/d 100%) sesuai.',
+            'error'
+        );
+        return;
+    }
+
+    batasSuhu = suhu;
+    batasKelembaban = kelembaban;
+    lastWarning = '';
+
+    log(
+        `Threshold disimpan: Suhu ${batasSuhu}°C, Kelembaban ${batasKelembaban}%`,
+        'success'
+    );
+
+    fetchHistory();
+    showToast(
+        'Threshold Diperbarui',
+        `Batas baru: Suhu maks ${batasSuhu}°C & Kelembaban maks ${batasKelembaban}%.`,
+        'success'
+    );
+}
+
+
+// =====================================
+// CEK THRESHOLD
+// =====================================
+
+function cekThreshold(suhu, kelembaban) {
+    const suhuMelebihi = suhu > batasSuhu;
+    const kelembabanMelebihi = kelembaban > batasKelembaban;
+
+    const badge = document.getElementById('threshold-badge');
+    const statusSuhu = document.getElementById('statusSuhu');
+    const statusKelembaban = document.getElementById('statusKelembaban');
+    const peringatan = document.getElementById('peringatan');
+
+    let pesan = [];
+
+    if (suhuMelebihi) {
+        statusSuhu.textContent = 'WARNING';
+        statusSuhu.className = 'status-badge warning';
+        pesan.push(`Suhu melebihi batas (${suhu}°C > ${batasSuhu}°C)`);
+    } else {
+        statusSuhu.textContent = 'NORMAL';
+        statusSuhu.className = 'status-badge normal';
+    }
+
+    if (kelembabanMelebihi) {
+        statusKelembaban.textContent = 'WARNING';
+        statusKelembaban.className = 'status-badge warning';
+        pesan.push(`Kelembaban melebihi batas (${kelembaban}% > ${batasKelembaban}%)`);
+    } else {
+        statusKelembaban.textContent = 'NORMAL';
+        statusKelembaban.className = 'status-badge normal';
+    }
+
+    if (suhuMelebihi || kelembabanMelebihi) {
+        badge.textContent = 'WARNING';
+        badge.className = 'status-badge warning';
+
+        peringatan.style.background = 'rgba(244, 63, 94, 0.14)';
+        peringatan.style.color = '#fb7185';
+        peringatan.style.borderColor = 'rgba(244, 63, 94, 0.35)';
+        peringatan.textContent = 'PERINGATAN: ' + pesan.join(' | ');
+
+        const warningKey = pesan.join('|');
+        if (warningKey !== lastWarning) {
+            const detailPesan = pesan.join(' | ');
+            log('THRESHOLD WARNING: ' + detailPesan, 'warning-log');
+            showToast('Peringatan Threshold Sensor!', detailPesan, 'warning', 6000);
+            playAlertSound();
+            sendDesktopNotif('Peringatan Sensor IoT!', detailPesan);
+            lastWarning = warningKey;
+        }
+    } else {
+        badge.textContent = 'NORMAL';
+        badge.className = 'status-badge normal';
+
+        peringatan.style.background = 'rgba(16, 185, 129, 0.14)';
+        peringatan.style.color = '#34d399';
+        peringatan.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+        peringatan.textContent = 'Sensor dalam kondisi NORMAL';
+
+        if (lastWarning !== '') {
+            log('Sensor kembali ke kondisi NORMAL', 'success');
+            showToast(
+                'Kondisi Sensor Normal',
+                `Suhu (${suhu}°C) dan kelembaban (${kelembaban}%) kembali aman.`,
+                'success'
+            );
+            lastWarning = '';
+        }
+    }
+}
+
+
+// =====================================
+// UPDATE GRAFIK
+// =====================================
+
+function updateChart(suhu, kelembaban) {
+    const waktu = new Date().toLocaleTimeString();
+
+    sensorChart.data.labels.push(waktu);
+    sensorChart.data.datasets[0].data.push(suhu);
+    sensorChart.data.datasets[1].data.push(kelembaban);
+
+    if (sensorChart.data.labels.length > 20) {
+        sensorChart.data.labels.shift();
+        sensorChart.data.datasets.forEach(dataset => {
+            dataset.data.shift();
+        });
+    }
+
+    sensorChart.update('none');
+}
+
+
+// =====================================
+// FETCH SENSOR
+// =====================================
+
+async function fetchSensor() {
+    try {
+        const res = await fetch(`${API_BASE}/suhu`, {
+            method: 'GET',
+            headers: getHeaders()
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const json = await res.json();
+
+        if (
+            json.status === 'success' &&
+            json.data &&
+            json.data.suhu !== null &&
+            json.data.suhu !== undefined
+        ) {
+            const suhu = Number(json.data.suhu);
+            const kelembaban = Number(json.data.kelembaban);
+
+            if (!Number.isFinite(suhu) || !Number.isFinite(kelembaban)) {
+                throw new Error('Format data sensor tidak valid');
+            }
+
+            if (offlineNotified) {
+                showToast('Koneksi Pulih', 'Sensor kembali terhubung ke REST API Node-RED.', 'success', 3500);
+                offlineNotified = false;
+            }
+
+            document.getElementById('suhu').textContent = suhu;
+            document.getElementById('kelembaban').textContent = kelembaban;
+
+            updateStatus(true);
+            cekThreshold(suhu, kelembaban);
+            updateChart(suhu, kelembaban);
+        } else {
+            updateStatus(false);
+        }
+    } catch (err) {
+        updateStatus(false);
+        log(`Gagal mengambil data suhu: ${err.message}`, 'error');
+
+        if (!offlineNotified) {
+            showToast(
+                'Sensor Offline / Koneksi Gagal',
+                `Tidak dapat menjangkau server Node-RED (${err.message}).`,
+                'error',
+                5000
+            );
+            offlineNotified = true;
+        }
+    }
+}
+
+
+// =====================================
+// FETCH HISTORY (10 DATA SENSOR TERAKHIR)
+// =====================================
+
+async function fetchHistory() {
+    try {
+        const res = await fetch(`${API_BASE}/history`, {
+            method: 'GET',
+            headers: getHeaders()
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const json = await res.json();
+        const tbody = document.getElementById('history-body');
+
+        if (!json.data || json.data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="table-empty">Belum ada riwayat data sensor</td>
+                </tr>
+            `;
+            return;
+        }
+
+        const rows = json.data.slice(-10).reverse();
+        tbody.innerHTML = '';
+
+        rows.forEach((d, index) => {
+            const tr = document.createElement('tr');
+
+            const numSuhu = Number(d.suhu);
+            const numKelembaban = Number(d.kelembaban);
+            const valid = Number.isFinite(numSuhu) && Number.isFinite(numKelembaban);
+
+            const suhuOver = valid && numSuhu > batasSuhu;
+            const humOver = valid && numKelembaban > batasKelembaban;
+            const melewati = suhuOver || humOver;
+
+            const tdNo = document.createElement('td');
+            tdNo.className = 'col-no';
+            tdNo.textContent = String(index + 1).padStart(2, '0');
+
+            const tdWaktu = document.createElement('td');
+            tdWaktu.className = 'col-time';
+            tdWaktu.textContent = d.received
+                ? new Date(d.received).toLocaleTimeString()
+                : '--:--:--';
+
+            const tdSuhu = document.createElement('td');
+            const chipSuhu = document.createElement('span');
+            chipSuhu.className = `val-chip ${suhuOver ? 'val-alert' : 'temp-normal'}`;
+            chipSuhu.textContent = d.suhu !== undefined && d.suhu !== null ? `${d.suhu} °C` : '--';
+            tdSuhu.appendChild(chipSuhu);
+
+            const tdKelembaban = document.createElement('td');
+            const chipHum = document.createElement('span');
+            chipHum.className = `val-chip ${humOver ? 'val-alert' : 'hum-normal'}`;
+            chipHum.textContent = d.kelembaban !== undefined && d.kelembaban !== null ? `${d.kelembaban} %` : '--';
+            tdKelembaban.appendChild(chipHum);
+
+            const tdStatus = document.createElement('td');
+            const badge = document.createElement('span');
+            if (valid) {
+                badge.className = `status-badge ${melewati ? 'warning' : 'normal'}`;
+                badge.textContent = melewati ? 'WARNING' : 'NORMAL';
+            } else {
+                badge.className = 'status-badge offline';
+                badge.textContent = 'INVALID';
+            }
+            tdStatus.appendChild(badge);
+
+            tr.appendChild(tdNo);
+            tr.appendChild(tdWaktu);
+            tr.appendChild(tdSuhu);
+            tr.appendChild(tdKelembaban);
+            tr.appendChild(tdStatus);
+
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        log(`Gagal mengambil history: ${err.message}`, 'error');
+    }
+}
+
+
+// =====================================
+// KONTROL LAMPU
+// =====================================
+
+async function kontrol(device, action) {
+    try {
+        const res = await fetch(`${API_BASE}/kontrol`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                device: device,
+                action: action
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const json = await res.json();
+
+        if (json.status === 'success') {
+            const labelAksi = action === 'on' ? 'dinyalakan' : 'dimatikan';
+            log(`Perintah terkirim: ${device} → ${action}`, 'success');
+            showToast(
+                'Kontrol Perangkat Berhasil',
+                `Lampu berhasil ${labelAksi} (${action.toUpperCase()}).`,
+                'success',
+                3500
+            );
+        } else {
+            const errMsg = json.message || 'Perintah ditolak oleh server';
+            log(`Gagal: ${errMsg}`, 'error');
+            showToast('Perintah Ditolak', errMsg, 'error');
+        }
+    } catch (err) {
+        log(`Error kontrol: ${err.message}`, 'error');
+        showToast('Gagal Mengirim Perintah', `Terjadi kesalahan jaringan: ${err.message}`, 'error');
+    }
+}
+
+
+// =====================================
+// MULAI DASHBOARD
+// =====================================
+
+log('Dashboard IoT dimulai', 'info');
+log('Threshold suhu maksimum: 30°C', 'info');
+log('Threshold kelembaban maksimum: 80%', 'info');
+log('Menghubungkan ke REST API Node-RED...', 'info');
+
+fetchSensor();
+fetchHistory();
+
+setInterval(fetchSensor, 3000);
+setInterval(fetchHistory, 5000);
+
+</script>
+
+</body>
+</html>
